@@ -24,6 +24,7 @@ TOY-CONSUMPTION-INVESTMENT/
 │   ├── models/             # Wealth dynamics, CRRA utility, Parameters
 │   └── solvers/            # Finite Horizon DP Solver (Backward Induction)
 └── requirements.txt        # Dependencies
+```
 
 ## How to Run
 
@@ -35,23 +36,27 @@ python -m venv .venv
 
 # Install requirements
 pip install -r requirements.txt
+```
 
 ### 2. Verify Baseline (Grid Search)
 Checks if the simulator physics match Merton's theoretical infinite-horizon solution ($\pi^* \approx 0.5, \alpha^* \approx 0.04$).
 ```bash
 python scripts/run_grid_search.py
+```
 
 ### 3. Train the Solver
 Runs backward induction to solve the Bellman equation and generates heatmaps of the optimal policy.
 ```bash
 python scripts/run_dp_solver.py
-Output: data/dp_policy_pi.png and data/dp_policy_alpha.png
+# Output: data/dp_policy_pi.png and data/dp_policy_alpha.png
+```
 
 ### 4. Run the Showdown
 Simulates 10,000 lifetimes to compare the Smart Agent (DP) against the Baseline.
 ```bash
 python scripts/run_comparison.py
-Output: Comparison plots of Wealth and Consumption trajectories.
+# Output: Comparison plots of Wealth and Consumption trajectories.
+```
 
 ### Model Parameters Table
 ## Model Parameters
@@ -72,4 +77,4 @@ $$V(t, W) = \max_{\pi, c} \left[ u(c)dt + e^{-\rho dt} \mathbb{E}[V(t+dt, W_{t+1
 
 **Findings:**
 * **Early Game ($t < 20$):** The agent mimics the infinite horizon solution (invest 50%, consume 4%).
-* **End Game ($t > 25$):** The agent dramatically ramps up consumption (to >20% rate) to dri
+* **End Game ($t > 25$):** The agent dramatically ramps up consumption (to >20% rate) to drive wealth to zero by $T=30$, capturing utility that the static baseline leaves on the table.
