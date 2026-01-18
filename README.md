@@ -55,7 +55,17 @@ Conservative Investor ($\gamma=5.0$) over 50 Years:
 ```bash
 python main.py --gamma 5.0 --T 50.0
 ```
-Available Arguments:| Flag | Default | Description || :--- | :--- | :--- || --gamma | 2.0 | Risk Aversion (Higher = More conservative) || --sigma | 0.20 | Volatility (Standard Deviation) || --mu | 0.06 | Expected Return (Drift) || --T | 30.0 | Investment Horizon (Years) || --paths | 5000 | Number of simulation paths |
+### Available Arguments
+| Flag | Default | Description |
+| :--- | :--- | :--- |
+| `--gamma` | `2.0` | Risk Aversion (Higher = More conservative) |
+| `--sigma` | `0.20` | Volatility (Standard Deviation) |
+| `--mu` | `0.06` | Expected Stock Return (Drift) |
+| `--r` | `0.02` | Risk-Free Rate |
+| `--rho` | `0.03` | Discount Rate (Time Preference) |
+| `--T` | `30.0` | Investment Horizon (Years) |
+| `--paths` | `5000` | Number of simulation paths |
+| `--output` | `"data"` | Directory to save generated plots |
 
 ### Theory & Results
 ## Theory & Results
