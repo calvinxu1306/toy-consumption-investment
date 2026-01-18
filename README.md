@@ -39,7 +39,7 @@ pip install -r requirements.txt
 ```
 
 ### 2. Verify Baseline (Grid Search)
-Checks if the simulator physics match Merton's theoretical infinite-horizon solution ($\pi^* \approx 0.5, \alpha^* \approx 0.04$).
+Checks if the simulator physics match Merton's theoretical infinite-horizon solution ($\pi^* \approx 0.5, \alpha^* \approx 0.03$).
 ```bash
 python scripts/run_grid_search.py
 ```
