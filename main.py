@@ -90,8 +90,18 @@ def main():
     
     # Plot Wealth
     plt.figure(figsize=(10, 6))
-    plt.plot(res_base["times"], res_base["W"].mean(axis=1), 'b--', label=f"Baseline (Merton pi={merton_pi:.2f})")
-    plt.plot(res_smart["times"], res_smart["W"].mean(axis=1), 'r-', label="Smart Agent (DP)")
+    
+    # Check shapes for debugging (optional, but helpful)
+    # print(f"DEBUG: Times shape: {res_base['times'].shape}")
+    # print(f"DEBUG: Wealth shape: {res_base['W'].shape}")
+
+    # Calculate mean wealth across paths (axis 0 is paths, axis 1 is time steps)
+    avg_w_base = res_base["W"].mean(axis=0)  
+    avg_w_smart = res_smart["W"].mean(axis=0)
+    
+    plt.plot(res_base["times"], avg_w_base, 'b--', label=f"Baseline (Merton pi={merton_pi:.2f})")
+    plt.plot(res_smart["times"], avg_w_smart, 'r-', label="Smart Agent (DP)")
+    
     plt.title(f"Wealth Trajectory (Gamma={args.gamma})")
     plt.xlabel("Years")
     plt.ylabel("Average Wealth")
