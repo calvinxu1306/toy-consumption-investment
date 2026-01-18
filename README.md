@@ -38,37 +38,24 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2. Verify Baseline (Grid Search)
-Checks if the simulator physics match Merton's theoretical infinite-horizon solution ($\pi^* \approx 0.5, \alpha^* \approx 0.03$).
+### 2. Run and Experiment
+Run the simulation with default settings ($\gamma=2, \sigma=0.2$):
 ```bash
-python scripts/run_grid_search.py
+python main.py
 ```
 
-### 3. Train the Solver
-Runs backward induction to solve the Bellman equation and generates heatmaps of the optimal policy.
+### 3. Custom Experiments
+Test different scenarios by passing arguments:
+High Risk Tolerance ($\gamma=1.0$) in a Volatile Market ($\sigma=0.3$):
 ```bash
-python scripts/run_dp_solver.py
-# Output: data/dp_policy_pi.png and data/dp_policy_alpha.png
+python main.py --gamma 1.0 --sigma 0.3
 ```
+Conservative Investor ($\gamma=5.0$) over 50 Years:
 
-### 4. Run the Showdown
-Simulates 10,000 lifetimes to compare the Smart Agent (DP) against the Baseline.
 ```bash
-python scripts/run_comparison.py
-# Output: Comparison plots of Wealth and Consumption trajectories.
+python main.py --gamma 5.0 --T 50.0
 ```
-
-### Model Parameters Table
-## Model Parameters
-| Parameter | Symbol | Value | Description |
-| :--- | :---: | :---: | :--- |
-| **Risk-Free Rate** | $r$ | 0.02 | 2% Annual risk-free return |
-| **Drift** | $\mu$ | 0.06 | 6% Annual expected stock return |
-| **Volatility** | $\sigma$ | 0.20 | 20% Annual standard deviation |
-| **Risk Aversion** | $\gamma$ | 2.0 | CRRA curvature parameter |
-| **Discount Rate** | $\rho$ | 0.03 | Time preference |
-| **Horizon** | $T$ | 30.0 | Years until the game ends |
-| **Terminal Weight** | $\kappa$ | 0.0 | No value assigned to leftover wealth |
+Available Arguments:| Flag | Default | Description || :--- | :--- | :--- || --gamma | 2.0 | Risk Aversion (Higher = More conservative) || --sigma | 0.20 | Volatility (Standard Deviation) || --mu | 0.06 | Expected Return (Drift) || --T | 30.0 | Investment Horizon (Years) || --paths | 5000 | Number of simulation paths |
 
 ### Theory & Results
 ## Theory & Results
