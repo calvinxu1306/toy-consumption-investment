@@ -1,7 +1,6 @@
 import numpy as np
 
-_EPS = 1e-12
-
+_EPS = 1e-2 
 
 def crra(c: np.ndarray | float, gamma: float):
     c_arr = np.maximum(np.asarray(c, dtype=float), _EPS)

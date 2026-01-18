@@ -23,7 +23,9 @@ TOY-CONSUMPTION-INVESTMENT/
 ├── src/
 │   ├── models/             # Wealth dynamics, CRRA utility, Parameters
 │   └── solvers/            # Finite Horizon DP Solver (Backward Induction)
-└── requirements.txt        # Dependencies
+├── main.py                 # CLI Entry Point (Run Experiments Here)
+├── requirements.txt        # Dependencies
+└── README.md               # Documentation
 ```
 
 ## How to Run
@@ -67,7 +69,24 @@ python main.py --gamma 5.0 --T 50.0
 | `--paths` | `5000` | Number of simulation paths |
 | `--output` | `"data"` | Directory to save generated plots |
 
-### Theory & Results
+## Web Dashboard (Interactive UI)
+
+For a more visual experience, the project includes a web-based dashboard built with **Streamlit**. This allows you to tweak parameters (Risk Aversion, Volatility, Horizon) using sliders and see the wealth trajectories update in real-time.
+
+### How to Launch
+```bash
+streamlit run app.py
+```
+
+This will automatically open the dashboard in your default web browser at http://localhost:8501.
+
+#### Features
+Real-Time Solver: Re-trains the Dynamic Programming agent instantly when you move a slider.
+
+Head-to-Head Comparison: Visualizes the "Smart Agent" vs. "Static Baseline" on the same graph.
+
+Performance Metrics: Displays the exact Utility Improvement (%) of the dynamic strategy.
+
 ## Theory & Results
 The problem is solved using the **Hamilton-Jacobi-Bellman (HJB)** equation logic, discretized via backward induction:
 $$V(t, W) = \max_{\pi, c} \left[ u(c)dt + e^{-\rho dt} \mathbb{E}[V(t+dt, W_{t+1})] \right]$$
