@@ -19,7 +19,7 @@ class DPSolverFiniteHorizon:
         
         # 2. Time Grid
         # If n_time_steps not provided, derive from T and dt
-        T = 30.0  # Default horizon
+        T = params.T if params.T is not None else 300  # Default horizon
         dt = 1/252
         if n_time_steps is None:
             self.n_t = int(round(T / dt))
