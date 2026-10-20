@@ -1,6 +1,8 @@
 import numpy as np
 
-_EPS = 1e-2 
+# Floor that keeps u(0) finite. Keep it far below any realistic consumption
+# level: a large floor makes utility flat at low wealth and distorts the policy.
+_EPS = 1e-8
 
 def crra(c: np.ndarray | float, gamma: float):
     c_arr = np.maximum(np.asarray(c, dtype=float), _EPS)
