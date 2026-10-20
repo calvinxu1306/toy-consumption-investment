@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from src.models.dynamics import simulate, WEALTH_FLOOR
 from src.models.metrics import summarize_terminal_wealth
 from src.models.params import ModelParams, SimConfig
-from src.models.policies import constant_policy
+from src.models.policies import constant_policy, get_merton_values
 
 def make_policy(pi_val: float, alpha_val: float):
     """Factory for constant (pi, alpha) policies."""
@@ -79,7 +79,7 @@ def main():
     # --- Part 1: Grid Search ---
     print(f"Starting Grid Search (N={sim.n_paths})...")
     pi_vals = np.linspace(0.3, 0.7, 5)    
-    alpha_vals = np.linspace(0.02, 0.06, 9)
+    alpha_vals = np.linspace(0.02, 0.10, 17)  # finite T pushes the best alpha above alpha*
 
     out_path = "data/policy_grid_local.csv"
     
@@ -92,6 +92,7 @@ def main():
         
         total_runs = len(pi_vals) * len(alpha_vals)
         count = 0
+        best = None
         
         for pi in pi_vals:
             for a in alpha_vals:
@@ -105,10 +106,19 @@ def main():
                     stats["mean"], stats["median"],
                     stats["p05"], stats["p95"], stats["prob_ruin"],
                 ])
+                if best is None or res["DU"] > best[2]:
+                    best = (pi, a, res["DU"])
                 if count % 5 == 0:
                     print(f"  Processed {count}/{total_runs}...")
                     
     print(f"Grid Search Complete. Results: {out_path}")
+
+    # Compare the best constant policy with the infinite-horizon Merton values.
+    # Over a finite horizon the best constant alpha sits above alpha*, because
+    # there is no reason to preserve wealth past T.
+    pi_star, alpha_star = get_merton_values(params)
+    print(f"  Best on grid:          pi={best[0]:.2f}, alpha={best[1]:.3f} (DU={best[2]:.2f})")
+    print(f"  Merton (infinite T):   pi={pi_star:.2f}, alpha={alpha_star:.3f}")
 
     # --- Part 2: Generate Plots for one baseline ---
     run_single_demo(params, sim)

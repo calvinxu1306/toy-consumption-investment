@@ -4,14 +4,10 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-import numpy as np
-import traceback # To print the full error
-
 # Import your modules
+from src.experiment import BASELINE, compare_policies, dp_gap, gain_vs_baseline, plot_comparison, train_dp_agent
 from src.models.params import ModelParams, SimConfig
-from src.models.dynamics import simulate
-from src.models.policies import constant_policy
-from src.solvers.dp_solver import DPSolverFiniteHorizon
+from src.models.policies import get_merton_values
 
 # Page Config
 st.set_page_config(page_title="Wealth Optimizer", layout="wide")
@@ -23,79 +19,41 @@ st.sidebar.header("Model Parameters")
 mu = st.sidebar.number_input("Expected Return (Drift)", 0.0, 0.2, 0.06, 0.01)
 sigma = st.sidebar.number_input("Volatility (Sigma)", 0.05, 0.5, 0.20, 0.01)
 r = st.sidebar.number_input("Risk-Free Rate", 0.0, 0.1, 0.02, 0.01)
+rho = st.sidebar.number_input("Discount Rate (Rho)", 0.0, 0.1, 0.03, 0.01)
 gamma = st.sidebar.slider("Risk Aversion (Gamma)", 0.5, 10.0, 2.0, 0.1)
 T = st.sidebar.slider("Time Horizon (Years)", 5, 60, 30, 5)
+kappa = st.sidebar.slider("Bequest Weight (Kappa)", 0.0, 5.0, 0.0, 0.5,
+                          help="Utility weight on wealth left at T. 0 = no bequest motive.")
+n_paths = st.sidebar.slider("Simulation Paths", 500, 10000, 5000, 500)
 
-# LOWER DEFAULT PATHS to prevent memory crashes during debugging
-n_paths = st.sidebar.slider("Simulation Paths", 50, 5000, 500, 50) 
+
+@st.cache_resource(show_spinner=False)
+def get_trained_solver(params: ModelParams):
+    # Cached per parameter set: changing only the number of paths does not retrain
+    return train_dp_agent(params)
+
 
 if st.button("Run Simulation"):
-    status = st.empty() # Placeholder for status updates
-    
-    try:
-        # --- STEP 1: SETUP ---
-        status.write("Step 1/4: Initializing Parameters...")
-        params = ModelParams(mu=mu, r=r, sigma=sigma, gamma=gamma, T=float(T))
-        sim_cfg = SimConfig(n_paths=n_paths, dt=1/252)
-        
-        # --- STEP 2: TRAINING ---
-        status.write("Step 2/4: Training AI Agent (Backward Induction)...")
-        # Using coarse grid for speed
-        solver = DPSolverFiniteHorizon(params, n_w_points=50, n_time_steps=int(T*4))
-        solver.initialize_terminal_condition()
-        solver.train_backward()
-        smart_policy = solver.get_policy_function()
-        
-        def smart_wrapper(w, t, p):
-            return smart_policy(w, t, p)
-        
-        # --- STEP 3: SIMULATION ---
-        status.write("Step 3/4: Running Monte Carlo Simulations...")
-        
-        # Define Baseline
-        merton_pi = (mu - r) / (gamma * sigma**2)
-        merton_pi = max(0, min(merton_pi, 2.0))
-        
-        def baseline_wrapper(w, t, p):
-            return constant_policy(w, t, p, pi_const=merton_pi, alpha_consume=0.04)
-        
-        # Run Sims
-        res_base = simulate(params, sim_cfg, baseline_wrapper)
-        res_smart = simulate(params, sim_cfg, smart_wrapper)
-        
-        # --- STEP 4: PLOTTING ---
-        status.write("Step 4/4: Generating Plots...")
-        
-        col1, col2 = st.columns(2)
-        u_base = res_base["DU"]
-        u_smart = res_smart["DU"]
-        imp = ((u_smart - u_base) / abs(u_base)) * 100
-        
-        with col1:
-            st.metric(label="Baseline Utility", value=f"{u_base:.4f}")
-        with col2:
-            st.metric(label="Smart Agent Utility", value=f"{u_smart:.4f}", delta=f"{imp:.2f}%")
+    params = ModelParams(mu=mu, r=r, sigma=sigma, rho=rho, gamma=gamma, T=float(T), kappa=kappa)
 
-        st.subheader("Wealth Trajectories")
-        
-        # Create figure explicitly
-        fig, ax = plt.subplots(figsize=(10, 5))
-        
-        # Plot with raw strings (r"") to fix warnings
-        ax.plot(res_base["times"], res_base["W"].mean(axis=0), 'b--', label=rf"Baseline (Fixed $\pi$={merton_pi:.2f})")
-        ax.plot(res_smart["times"], res_smart["W"].mean(axis=0), 'r-', label="Smart Agent (Dynamic)")
-        
-        ax.set_xlabel("Years")
-        ax.set_ylabel("Average Wealth")
-        ax.grid(alpha=0.3)
-        ax.legend()
-        
-        st.pyplot(fig)
-        plt.close(fig) 
-        
-        status.success("Simulation Complete!")
+    with st.spinner("Training DP agent (backward induction)..."):
+        solver = get_trained_solver(params)
+    with st.spinner("Running Monte Carlo simulations..."):
+        results = compare_policies(params, SimConfig(n_paths=n_paths), solver)
 
-    except Exception as e:
-        # If it crashes, this will show the error RED on screen instead of white screen
-        st.error("An error occurred!")
-        st.code(traceback.format_exc())
+    # --- Scores: certainty-equivalent consumption ---
+    st.subheader("Certainty-Equivalent Consumption")
+    st.caption("The sure, constant consumption rate each policy is worth to the agent "
+               "(higher is better). Unlike raw utility, percentage differences are meaningful.")
+    for col, (name, res) in zip(st.columns(3), results.items()):
+        delta = None if name == BASELINE else f"{gain_vs_baseline(results, name):+.1%} vs baseline"
+        col.metric(label=name, value=f"{res['CE']:.4f}", delta=delta)
+
+    pi_star, alpha_star = get_merton_values(params)
+    st.caption(f"Static Merton uses pi* = {pi_star:.2f} and alpha* = {max(alpha_star, 0.0):.4f} "
+               f"at every date. The DP agent is within {dp_gap(results):.2%} of the closed-form optimum.")
+
+    st.subheader("Wealth and Consumption Trajectories")
+    fig = plot_comparison(results)
+    st.pyplot(fig)
+    plt.close(fig)

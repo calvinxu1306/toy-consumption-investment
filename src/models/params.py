@@ -21,7 +21,7 @@ class ModelParams:
 @dataclass(frozen=True)
 class SimConfig:
     # Simulation settings
-    dt: float = 1 / 252   # years per step (daily)
+    dt: float = 1 / 12    # years per step (monthly, same as the DP solver's default)
     n_paths: int = 20_000
     seed: int | None = 7
     absorb_at_zero: bool = True

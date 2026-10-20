@@ -8,6 +8,16 @@ from src.models.utility import crra, terminal_crra
 logger = logging.getLogger(__name__)
 
 
+def _parabolic_step(f_minus, f_0, f_plus):
+    """
+    Offset, in grid steps, of the vertex of the parabola through three equally
+    spaced points (within +-0.5 when f_0 is the largest; 0 if they are flat).
+    """
+    curvature = f_minus - 2.0 * f_0 + f_plus
+    safe = np.where(curvature < 0, curvature, -1.0)
+    return np.where(curvature < 0, np.clip(0.5 * (f_minus - f_plus) / safe, -0.5, 0.5), 0.0)
+
+
 class DPSolverFiniteHorizon:
     def __init__(self, params: ModelParams,
                  w_min=0.01, w_max=15.0, n_w_points=40,
@@ -98,6 +108,7 @@ class DPSolverFiniteHorizon:
         alpha_options = np.concatenate([[0.0], np.geomspace(1e-3, 1.0 / self.dt, 80)])
 
         # Create a meshgrid of controls for vectorized evaluation
+        # (flattened index = alpha_index * len(pi_options) + pi_index)
         PI, ALPHA = np.meshgrid(pi_options, alpha_options)
         PI = PI.flatten()
         ALPHA = ALPHA.flatten()
@@ -154,10 +165,39 @@ class DPSolverFiniteHorizon:
             best_idx = np.argmax(objective, axis=1)
 
             self.V[k] = objective[rows, best_idx]
-            self.opt_pi[k] = PI[best_idx]
-            self.opt_c[k] = ALPHA[best_idx] # Storing alpha, not raw c
+            # Storing alpha, not raw c
+            self.opt_pi[k], self.opt_c[k] = self._refine_controls(
+                objective, best_idx, pi_options, alpha_options)
 
         logger.info("Backward Induction Complete.")
+
+    def _refine_controls(self, objective, best_idx, pi_options, alpha_options):
+        """
+        The best grid point can be up to half a step from the true optimum, which
+        shows up as a sawtooth in consumption over time. Fit a parabola through the
+        best point and its neighbours along each control and move to its vertex
+        (alpha in log space, where its grid is uniform). V keeps the grid maximum,
+        the value of a policy that is actually on the grid.
+        """
+        n_pi, n_alpha = len(pi_options), len(alpha_options)
+        obj = objective.reshape(self.n_w, n_alpha, n_pi)
+        ia, ip = np.divmod(best_idx, n_pi)
+        rows = np.arange(self.n_w)
+        pi, alpha = pi_options[ip], alpha_options[ia]
+
+        # Risky weight: refine where both neighbours exist
+        if n_pi >= 3:
+            j = np.clip(ip, 1, n_pi - 2)
+            step = _parabolic_step(obj[rows, ia, j - 1], obj[rows, ia, j], obj[rows, ia, j + 1])
+            pi = pi + np.where(ip == j, step, 0.0) * (pi_options[1] - pi_options[0])
+
+        # Consumption rate: index 0 is alpha = 0, so the log-spaced part starts at 1
+        if n_alpha >= 4:
+            j = np.clip(ia, 2, n_alpha - 2)
+            step = _parabolic_step(obj[rows, j - 1, ip], obj[rows, j, ip], obj[rows, j + 1, ip])
+            alpha = alpha * np.exp(np.where(ia == j, step, 0.0) * np.log(alpha_options[2] / alpha_options[1]))
+
+        return pi, alpha
 
     def get_policy_function(self):
         """

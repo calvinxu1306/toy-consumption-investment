@@ -8,12 +8,12 @@ def simulate(params, sim, policy_func):
     """
     Simulates wealth paths under a given policy.
     Uses params.T to determine simulation horizon (from CLI args).
+    Path arrays are shaped (n_paths, n_steps): average over axis 0 for per-date stats.
     """
     # 1. Setup Time Grid
-    # FIX: Use params.T (which comes from CLI) instead of sim.T
-    n_steps = int(round(params.T / sim.dt))
+    n_steps = max(1, int(round(params.T / sim.dt)))
     time_grid = np.linspace(0, params.T, n_steps + 1)
-    dt = sim.dt
+    dt = params.T / n_steps  # exact spacing of time_grid
     sqrt_dt = np.sqrt(dt)
     
     # 2. Initialize Arrays
@@ -27,11 +27,9 @@ def simulate(params, sim, policy_func):
     W[:, 0] = 1.0  # Start with wealth = 1.0
     
     # 3. Random Shocks
-    if sim.seed is not None:
-        np.random.seed(sim.seed)
-    
-    # Generate Brownian increments (Standard Normal)
-    Z = np.random.randn(sim.n_paths, n_steps)
+    # Drawn one step at a time rather than as an (n_paths, n_steps) block, to save
+    # memory. A given seed gives every policy the same shocks (paired comparison).
+    rng = np.random.default_rng(sim.seed)
     
     # 4. Time Loop
     for k in range(n_steps):
@@ -48,7 +46,8 @@ def simulate(params, sim, policy_func):
         
         # Evolve Wealth: dW = (r + pi*(mu-r))*W*dt - C*dt + pi*sigma*W*dW
         drift = (params.r * w_curr + pi_k * (params.mu - params.r) * w_curr - c_k) * dt
-        diffusion = (pi_k * params.sigma * w_curr) * (Z[:, k] * sqrt_dt)
+        z_k = rng.standard_normal(sim.n_paths)
+        diffusion = (pi_k * params.sigma * w_curr) * (z_k * sqrt_dt)
         
         w_next = w_curr + drift + diffusion
         
@@ -78,5 +77,7 @@ def simulate(params, sim, policy_func):
         "C": C,
         "Pi": Pi,
         "times": time_grid,
-        "DU": np.mean(total_utility)
+        "U": total_utility,                     # per-path discounted utility
+        "DU": np.mean(total_utility),
+        "DU_se": np.std(total_utility, ddof=1) / np.sqrt(sim.n_paths),  # Monte Carlo standard error
     }
