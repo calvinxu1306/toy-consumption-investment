@@ -51,7 +51,7 @@ if st.button("Run Simulation"):
 
     pi_star, alpha_star = get_merton_values(params)
     st.caption(f"Static Merton uses pi* = {pi_star:.2f} and alpha* = {max(alpha_star, 0.0):.4f} "
-               f"at every date. The DP agent is within {dp_gap(results):.2%} of the closed-form optimum.")
+               f"at every date. The DP agent is within {dp_gap(results)} of the closed-form optimum.")
 
     st.subheader("Wealth and Consumption Trajectories")
     fig = plot_comparison(results)

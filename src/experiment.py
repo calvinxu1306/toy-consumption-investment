@@ -62,9 +62,10 @@ def gain_vs_baseline(results: dict[str, dict], name: str) -> float:
     return results[name]["CE"] / base_ce - 1 if base_ce > 0 else float("inf")
 
 
-def dp_gap(results: dict[str, dict]) -> float:
+def dp_gap(results: dict[str, dict]) -> str:
     """Relative distance between the DP agent and the closed-form optimum (CE units)."""
-    return abs(1 - results[DP_AGENT]["CE"] / results[OPTIMUM]["CE"])
+    gap = abs(1 - results[DP_AGENT]["CE"] / results[OPTIMUM]["CE"])
+    return f"{gap:.2%}" if gap >= 5e-5 else "<0.01%"
 
 
 def format_scoreboard(results: dict[str, dict]) -> str:
@@ -73,7 +74,7 @@ def format_scoreboard(results: dict[str, dict]) -> str:
         du = f"{res['DU']:.4g} +/- {res['DU_se']:.2g}"
         lines.append(f"{name:<21}{du:>24}{res['CE']:>16.4f}"
                      f"{gain_vs_baseline(results, name):>+13.1%}")
-    lines.append(f"\nDP agent is within {dp_gap(results):.2%} of the closed-form optimum "
+    lines.append(f"\nDP agent is within {dp_gap(results)} of the closed-form optimum "
                  f"(certainty-equivalent consumption).")
     return "\n".join(lines)
 
