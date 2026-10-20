@@ -15,7 +15,7 @@ class ModelParams:
     T: float = 30.0       # years
     
     # Constraints & Terminal
-    cbar: float = 0.08    # max consumption rate (optional)
+    pi_max: float = 1.5   # max risky weight (leverage limit), applied to every policy
     kappa: float = 0.0    # terminal-wealth weight
 
 @dataclass(frozen=True)
