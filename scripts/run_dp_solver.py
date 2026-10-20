@@ -13,6 +13,8 @@ def plot_heatmaps(solver, save_dir="data"):
     """
     Visualizes the optimal policies (Pi and Alpha) as heatmaps (Time vs Wealth).
     """
+    os.makedirs(save_dir, exist_ok=True)
+
     # 1. Prepare Data for Heatmap
     # V, opt_pi, opt_c are shape (n_t, n_w) or similar.
     # We transpose them so Time is on X-axis, Wealth on Y-axis

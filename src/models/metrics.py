@@ -1,5 +1,7 @@
 import numpy as np
 
+from src.models.dynamics import WEALTH_FLOOR
+
 
 def summarize_terminal_wealth(terminal_wealth: np.ndarray) -> dict[str, float]:
     """Basic stats for W_T."""
@@ -8,7 +10,7 @@ def summarize_terminal_wealth(terminal_wealth: np.ndarray) -> dict[str, float]:
         "median": float(np.median(terminal_wealth)),
         "p05": float(np.quantile(terminal_wealth, 0.05)),
         "p95": float(np.quantile(terminal_wealth, 0.95)),
-        "prob_ruin": float(np.mean(terminal_wealth <= 0.0)),
+        "prob_ruin": float(np.mean(terminal_wealth <= WEALTH_FLOOR)),
     }
 
 

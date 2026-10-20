@@ -1,6 +1,9 @@
 import numpy as np
 from src.models.utility import crra, terminal_crra
 
+# Paths that would go negative are held at this level; treat it as ruin.
+WEALTH_FLOOR = 1e-6
+
 def simulate(params, sim, policy_func):
     """
     Simulates wealth paths under a given policy.
@@ -51,7 +54,7 @@ def simulate(params, sim, policy_func):
         
         # Absorb at zero (cannot have negative wealth)
         if sim.absorb_at_zero:
-            w_next = np.maximum(w_next, 1e-6)
+            w_next = np.maximum(w_next, WEALTH_FLOOR)
             
         W[:, k+1] = w_next
 

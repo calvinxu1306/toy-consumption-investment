@@ -6,7 +6,8 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.models.dynamics import simulate
+from src.models.dynamics import simulate, WEALTH_FLOOR
+from src.models.metrics import summarize_terminal_wealth
 from src.models.params import ModelParams, SimConfig
 from src.models.policies import constant_policy
 
@@ -28,13 +29,12 @@ def run_single_demo(params, sim):
     out = simulate(params, sim, demo_policy)
     
     t = out["times"]
-    w = out["W"]
-    RUIN_EPS = 1e-6
+    w = out["W"]  # (n_paths, n_steps + 1)
 
     # 1. Wealth Quantiles
-    q05 = np.quantile(w, 0.05, axis=1)
-    q50 = np.quantile(w, 0.50, axis=1)
-    q95 = np.quantile(w, 0.95, axis=1)
+    q05 = np.quantile(w, 0.05, axis=0)
+    q50 = np.quantile(w, 0.50, axis=0)
+    q95 = np.quantile(w, 0.95, axis=0)
 
     plt.figure()
     plt.plot(t, q50, label="median")
@@ -48,7 +48,7 @@ def run_single_demo(params, sim):
     print("Saved: data/wealth_quantiles.png")
 
     # 2. Ruin Curve
-    ruin_curve = (w <= RUIN_EPS).mean(axis=1)
+    ruin_curve = (w <= WEALTH_FLOOR).mean(axis=0)
     plt.figure()
     plt.plot(t, ruin_curve)
     plt.xlabel("Years")
@@ -60,8 +60,8 @@ def run_single_demo(params, sim):
 
     # 3. Sample Paths
     plt.figure()
-    sel = min(50, w.shape[1])
-    plt.plot(t, w[:, :sel])
+    sel = min(50, w.shape[0])
+    plt.plot(t, w[:sel].T)
     plt.title("Wealth Sample Paths")
     plt.xlabel("Years")
     plt.ylabel("Wealth")
@@ -99,13 +99,11 @@ def main():
                 policy = make_policy(pi, a)
                 res = simulate(params, sim, policy)
                 
-                W_T = res["W"][-1]
+                stats = summarize_terminal_wealth(res["W"][:, -1])
                 w.writerow([
                     float(pi), float(a), float(res["DU"]),
-                    float(W_T.mean()), float(np.median(W_T)),
-                    float(np.quantile(W_T, 0.05)),
-                    float(np.quantile(W_T, 0.95)),
-                    float((W_T <= 0.0).mean()),
+                    stats["mean"], stats["median"],
+                    stats["p05"], stats["p95"], stats["prob_ruin"],
                 ])
                 if count % 5 == 0:
                     print(f"  Processed {count}/{total_runs}...")

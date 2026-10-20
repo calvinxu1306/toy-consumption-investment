@@ -56,8 +56,8 @@ def main():
     
     # 5. Visualization: Average Wealth Paths
     t_grid = res_base["times"]
-    avg_w_base = res_base["W"].mean(axis=1)
-    avg_w_smart = res_smart["W"].mean(axis=1)
+    avg_w_base = res_base["W"].mean(axis=0)
+    avg_w_smart = res_smart["W"].mean(axis=0)
     
     plt.figure(figsize=(10, 6))
     plt.plot(t_grid, avg_w_base, 'b--', label="Baseline (Constant)", alpha=0.7)
@@ -74,8 +74,8 @@ def main():
     print("\nSaved plot to data/comparison_wealth.png")
     
     # Visualization: Average Consumption Paths
-    avg_c_base = res_base["C"].mean(axis=1)
-    avg_c_smart = res_smart["C"].mean(axis=1)
+    avg_c_base = res_base["C"].mean(axis=0)
+    avg_c_smart = res_smart["C"].mean(axis=0)
     
     plt.figure(figsize=(10, 6))
     plt.plot(t_grid[:-1], avg_c_base, 'b--', label="Baseline Consumption", alpha=0.7)
