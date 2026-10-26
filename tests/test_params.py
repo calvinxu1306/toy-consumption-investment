@@ -36,8 +36,8 @@ def test_sim_config_rejects_invalid_values(kwargs):
     (["--T", "-5"], "T must be > 0"),
     (["--paths", "1"], "n_paths must be >= 2"),
 ])
-def test_cli_reports_invalid_arguments_without_traceback(args, message):
-    proc = subprocess.run([sys.executable, "main.py", *args],
+def test_cli_reports_invalid_arguments_without_traceback(args, message, tmp_path):
+    proc = subprocess.run([sys.executable, "main.py", *args, "--output", str(tmp_path)],
                           cwd=REPO_ROOT, capture_output=True, text=True, timeout=60)
     assert proc.returncode == 2
     assert message in proc.stderr
