@@ -91,6 +91,8 @@ python main.py --gamma 5.0 --T 50.0
 
 All policies share the same constraint: risky weight in $[0, 1.5]$ (`ModelParams.pi_max`).
 
+Invalid values are rejected with an error message: `--gamma` and `--T` must be positive, `--sigma` and `--kappa` non-negative, `--paths` at least 2, and `--seed` non-negative.
+
 ### 4. Run the Tests
 ```bash
 pip install -r requirements-dev.txt

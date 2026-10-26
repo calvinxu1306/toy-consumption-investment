@@ -29,17 +29,24 @@ def parse_arguments():
     parser.add_argument("--seed", type=int, default=42, help="Random seed (all policies see the same shocks)")
     parser.add_argument("--output", type=str, default="data", help="Output directory for plots")
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    # Build (and validate) the configuration here, so a bad value produces a
+    # usage error instead of a traceback or a table of nan
+    try:
+        params = ModelParams(
+            mu=args.mu, r=args.r, sigma=args.sigma,
+            gamma=args.gamma, rho=args.rho, T=args.T, kappa=args.kappa
+        )
+        sim_cfg = SimConfig(n_paths=args.paths, seed=args.seed)
+    except ValueError as err:
+        parser.error(str(err))
+    return args, params, sim_cfg
 
 def main():
-    args = parse_arguments()
+    # 1. Read Parameters from Arguments
+    args, params, sim_cfg = parse_arguments()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    # 1. Update Parameters from Arguments
-    params = ModelParams(
-        mu=args.mu, r=args.r, sigma=args.sigma,
-        gamma=args.gamma, rho=args.rho, T=args.T, kappa=args.kappa
-    )
     pi_star, alpha_star = get_merton_values(params)
 
     print("--- Configuration ---")
@@ -54,7 +61,7 @@ def main():
 
     # 3. Run Simulation
     print("\n--- 2. Running Simulations ---")
-    results = compare_policies(params, SimConfig(n_paths=args.paths, seed=args.seed), solver)
+    results = compare_policies(params, sim_cfg, solver)
 
     # 4. Compare Results
     print("\n" + "=" * 74)
