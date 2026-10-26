@@ -1,115 +1,74 @@
 import argparse
+import logging
 import os
-import matplotlib.pyplot as plt
-import numpy as np
 
+import matplotlib.pyplot as plt
+
+from src.experiment import compare_policies, format_scoreboard, plot_comparison, train_dp_agent
 from src.models.params import ModelParams, SimConfig
-from src.models.dynamics import simulate
-from src.models.policies import constant_policy
-from src.solvers.dp_solver import DPSolverFiniteHorizon
+from src.models.policies import get_merton_values
 
 def parse_arguments():
     """
     Defines the available command-line arguments.
     """
+    defaults = ModelParams()
     parser = argparse.ArgumentParser(description="Optimal Consumption & Investment Simulator (CLI)")
-    
+
     # Financial Parameters
-    parser.add_argument("--mu", type=float, default=0.06, help="Expected stock return (Drift)")
-    parser.add_argument("--r", type=float, default=0.02, help="Risk-free rate")
-    parser.add_argument("--sigma", type=float, default=0.20, help="Volatility (Standard Deviation)")
-    parser.add_argument("--gamma", type=float, default=2.0, help="Risk Aversion (Higher = More conservative)")
-    parser.add_argument("--T", type=float, default=30.0, help="Investment Horizon (Years)")
-    parser.add_argument("--rho", type=float, default=0.03, help="Discount Rate")
-    
+    parser.add_argument("--mu", type=float, default=defaults.mu, help="Expected stock return (Drift)")
+    parser.add_argument("--r", type=float, default=defaults.r, help="Risk-free rate")
+    parser.add_argument("--sigma", type=float, default=defaults.sigma, help="Volatility (Standard Deviation)")
+    parser.add_argument("--gamma", type=float, default=defaults.gamma, help="Risk Aversion (Higher = More conservative)")
+    parser.add_argument("--T", type=float, default=defaults.T, help="Investment Horizon (Years)")
+    parser.add_argument("--rho", type=float, default=defaults.rho, help="Discount Rate")
+    parser.add_argument("--kappa", type=float, default=defaults.kappa, help="Bequest weight on terminal wealth (0 = none)")
+
     # Simulation Settings
     parser.add_argument("--paths", type=int, default=5000, help="Number of simulation paths")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (all policies see the same shocks)")
     parser.add_argument("--output", type=str, default="data", help="Output directory for plots")
 
     return parser.parse_args()
 
 def main():
     args = parse_arguments()
-    
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
     # 1. Update Parameters from Arguments
-    print(f"--- Configuration ---")
-    print(f"Risk Aversion (Gamma): {args.gamma}")
-    print(f"Volatility (Sigma):    {args.sigma}")
-    print(f"Horizon (T):           {args.T} years")
-    
     params = ModelParams(
-        mu=args.mu, r=args.r, sigma=args.sigma, 
-        gamma=args.gamma, rho=args.rho, T=args.T
+        mu=args.mu, r=args.r, sigma=args.sigma,
+        gamma=args.gamma, rho=args.rho, T=args.T, kappa=args.kappa
     )
-    
+    pi_star, alpha_star = get_merton_values(params)
+
+    print("--- Configuration ---")
+    print(f"Market:  mu={params.mu}, r={params.r}, sigma={params.sigma}")
+    print(f"Agent:   gamma={params.gamma}, rho={params.rho}, kappa={params.kappa}")
+    print(f"Horizon: T={params.T} years")
+    print(f"Merton:  pi*={pi_star:.3f}, alpha*={alpha_star:.4f}")
+
     # 2. Train the Smart Agent
     print("\n--- 1. Training Smart Agent (DP Solver) ---")
-    # We adjust grid size dynamically based on horizon to keep it reasonably fast
-    n_steps = int(args.T * 10) # 10 steps per year
-    solver = DPSolverFiniteHorizon(params, w_min=0.01, w_max=15.0, 
-                                   n_w_points=100, n_time_steps=n_steps)
-    solver.initialize_terminal_condition()
-    solver.train_backward()
-    
-    smart_policy_func = solver.get_policy_function()
-    
-    # 3. Define Policies
-    def smart_wrapper(w, t, p):
-        return smart_policy_func(w, t, p)
+    solver = train_dp_agent(params)
 
-    # Calculate Merton Benchmark for comparison
-    merton_pi = (args.mu - args.r) / (args.gamma * args.sigma**2)
-    print(f"   (Merton Benchmark Pi*: {merton_pi:.2f})")
-    
-    def baseline_wrapper(w, t, p):
-        # Use simple Merton constant for baseline
-        return constant_policy(w, t, p, pi_const=merton_pi, alpha_consume=0.04)
-
-    # 4. Run Simulation
+    # 3. Run Simulation
     print("\n--- 2. Running Simulations ---")
-    sim_cfg = SimConfig(n_paths=args.paths, seed=42)
-    
-    res_base = simulate(params, sim_cfg, baseline_wrapper)
-    res_smart = simulate(params, sim_cfg, smart_wrapper)
-    
-    # 5. Compare Results
-    du_base = res_base["DU"]
-    du_smart = res_smart["DU"]
-    imp = ((du_smart - du_base) / abs(du_base)) * 100
-    
-    print("\n" + "="*30)
-    print(f"FINAL SCORE (Expected Utility)")
-    print("="*30)
-    print(f"Baseline:    {du_base:.4f}")
-    print(f"Smart Agent: {du_smart:.4f}")
-    print(f"Improvement: {imp:+.2f}%")
-    print("="*30)
+    results = compare_policies(params, SimConfig(n_paths=args.paths, seed=args.seed), solver)
 
-    # 6. Save Plots
+    # 4. Compare Results
+    print("\n" + "=" * 74)
+    print(format_scoreboard(results))
+    print("=" * 74)
+
+    # 5. Save Plots
     os.makedirs(args.output, exist_ok=True)
-    
-    # Plot Wealth
-    plt.figure(figsize=(10, 6))
-    
-    # Check shapes for debugging (optional, but helpful)
-    # print(f"DEBUG: Times shape: {res_base['times'].shape}")
-    # print(f"DEBUG: Wealth shape: {res_base['W'].shape}")
-
-    # Calculate mean wealth across paths (axis 0 is paths, axis 1 is time steps)
-    avg_w_base = res_base["W"].mean(axis=0)  
-    avg_w_smart = res_smart["W"].mean(axis=0)
-    
-    plt.plot(res_base["times"], avg_w_base, 'b--', label=f"Baseline (Merton pi={merton_pi:.2f})")
-    plt.plot(res_smart["times"], avg_w_smart, 'r-', label="Smart Agent (DP)")
-    
-    plt.title(f"Wealth Trajectory (Gamma={args.gamma})")
-    plt.xlabel("Years")
-    plt.ylabel("Average Wealth")
-    plt.legend()
-    plt.grid(alpha=0.3)
-    
-    filename = f"{args.output}/cli_wealth_g{args.gamma}_s{args.sigma}.png"
-    plt.savefig(filename)
+    tag = (f"g{params.gamma}_s{params.sigma}_mu{params.mu}_r{params.r}"
+           f"_rho{params.rho}_T{params.T}_k{params.kappa}")
+    fig = plot_comparison(results, title=f"gamma={params.gamma}, sigma={params.sigma}, T={params.T}")
+    filename = os.path.join(args.output, f"cli_wealth_{tag}.png")
+    fig.savefig(filename)
+    plt.close(fig)
     print(f"\nResults saved to: {filename}")
 
 if __name__ == "__main__":

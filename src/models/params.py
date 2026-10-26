@@ -15,13 +15,13 @@ class ModelParams:
     T: float = 30.0       # years
     
     # Constraints & Terminal
-    cbar: float = 0.08    # max consumption rate (optional)
+    pi_max: float = 1.5   # max risky weight (leverage limit), applied to every policy
     kappa: float = 0.0    # terminal-wealth weight
 
 @dataclass(frozen=True)
 class SimConfig:
     # Simulation settings
-    dt: float = 1 / 252   # years per step (daily)
+    dt: float = 1 / 12    # years per step (monthly, same as the DP solver's default)
     n_paths: int = 20_000
     seed: int | None = 7
     absorb_at_zero: bool = True

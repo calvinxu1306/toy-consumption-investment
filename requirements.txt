@@ -1,6 +1,3 @@
-numpy
-scipy
-matplotlib
-seaborn
-streamlit
-pandas
+numpy>=1.26
+matplotlib>=3.7
+streamlit>=1.30

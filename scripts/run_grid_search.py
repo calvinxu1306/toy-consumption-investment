@@ -6,9 +6,10 @@ import csv
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.models.dynamics import simulate
+from src.models.dynamics import simulate, WEALTH_FLOOR
+from src.models.metrics import summarize_terminal_wealth
 from src.models.params import ModelParams, SimConfig
-from src.models.policies import constant_policy
+from src.models.policies import constant_policy, get_merton_values
 
 def make_policy(pi_val: float, alpha_val: float):
     """Factory for constant (pi, alpha) policies."""
@@ -28,13 +29,12 @@ def run_single_demo(params, sim):
     out = simulate(params, sim, demo_policy)
     
     t = out["times"]
-    w = out["W"]
-    RUIN_EPS = 1e-6
+    w = out["W"]  # (n_paths, n_steps + 1)
 
     # 1. Wealth Quantiles
-    q05 = np.quantile(w, 0.05, axis=1)
-    q50 = np.quantile(w, 0.50, axis=1)
-    q95 = np.quantile(w, 0.95, axis=1)
+    q05 = np.quantile(w, 0.05, axis=0)
+    q50 = np.quantile(w, 0.50, axis=0)
+    q95 = np.quantile(w, 0.95, axis=0)
 
     plt.figure()
     plt.plot(t, q50, label="median")
@@ -48,7 +48,7 @@ def run_single_demo(params, sim):
     print("Saved: data/wealth_quantiles.png")
 
     # 2. Ruin Curve
-    ruin_curve = (w <= RUIN_EPS).mean(axis=1)
+    ruin_curve = (w <= WEALTH_FLOOR).mean(axis=0)
     plt.figure()
     plt.plot(t, ruin_curve)
     plt.xlabel("Years")
@@ -60,8 +60,8 @@ def run_single_demo(params, sim):
 
     # 3. Sample Paths
     plt.figure()
-    sel = min(50, w.shape[1])
-    plt.plot(t, w[:, :sel])
+    sel = min(50, w.shape[0])
+    plt.plot(t, w[:sel].T)
     plt.title("Wealth Sample Paths")
     plt.xlabel("Years")
     plt.ylabel("Wealth")
@@ -79,7 +79,7 @@ def main():
     # --- Part 1: Grid Search ---
     print(f"Starting Grid Search (N={sim.n_paths})...")
     pi_vals = np.linspace(0.3, 0.7, 5)    
-    alpha_vals = np.linspace(0.02, 0.06, 9)
+    alpha_vals = np.linspace(0.02, 0.10, 17)  # finite T pushes the best alpha above alpha*
 
     out_path = "data/policy_grid_local.csv"
     
@@ -92,6 +92,7 @@ def main():
         
         total_runs = len(pi_vals) * len(alpha_vals)
         count = 0
+        best = None
         
         for pi in pi_vals:
             for a in alpha_vals:
@@ -99,18 +100,25 @@ def main():
                 policy = make_policy(pi, a)
                 res = simulate(params, sim, policy)
                 
-                W_T = res["W"][-1]
+                stats = summarize_terminal_wealth(res["W"][:, -1])
                 w.writerow([
                     float(pi), float(a), float(res["DU"]),
-                    float(W_T.mean()), float(np.median(W_T)),
-                    float(np.quantile(W_T, 0.05)),
-                    float(np.quantile(W_T, 0.95)),
-                    float((W_T <= 0.0).mean()),
+                    stats["mean"], stats["median"],
+                    stats["p05"], stats["p95"], stats["prob_ruin"],
                 ])
+                if best is None or res["DU"] > best[2]:
+                    best = (pi, a, res["DU"])
                 if count % 5 == 0:
                     print(f"  Processed {count}/{total_runs}...")
                     
     print(f"Grid Search Complete. Results: {out_path}")
+
+    # Compare the best constant policy with the infinite-horizon Merton values.
+    # Over a finite horizon the best constant alpha sits above alpha*, because
+    # there is no reason to preserve wealth past T.
+    pi_star, alpha_star = get_merton_values(params)
+    print(f"  Best on grid:          pi={best[0]:.2f}, alpha={best[1]:.3f} (DU={best[2]:.2f})")
+    print(f"  Merton (infinite T):   pi={pi_star:.2f}, alpha={alpha_star:.3f}")
 
     # --- Part 2: Generate Plots for one baseline ---
     run_single_demo(params, sim)
